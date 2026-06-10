@@ -10,16 +10,15 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.target }}
+    name: Build ${{ matrix.os }}-${{ matrix.arch }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target:
-          - linux/amd64
-          - linux/arm64
-          - darwin/amd64
-          - darwin/arm64
-          - windows/amd64
+        os: [linux, darwin, windows]
+        arch: [amd64, arm64]
+        exclude:
+          - os: windows
+            arch: arm64
     steps:
       - uses: actions/checkout@v4
 
@@ -29,23 +28,18 @@ jobs:
           cache: true
 
       - name: Build
-        env:
-          GOOS: ${{ matrix.target-os }}
-          GOARCH: ${{ matrix.target-arch }}
         run: |
-          os_arch="${{ matrix.target }}"
-          os="${os_arch%%/*}"
-          arch="${os_arch##*/}"
           ext=""
-          [ "$os" = "windows" ] && ext=".exe"
-          output="sekai-server-${os}-${arch}${ext}"
-          GOOS="$os" GOARCH="$arch" go build -ldflags="-s -w" -o "$output" .
+          [ "${{ matrix.os }}" = "windows" ] && ext=".exe"
+          output="sekai-server-${{ matrix.os }}-${{ matrix.arch }}${ext}"
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+            go build -ldflags="-s -w" -o "$output" .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sekai-server-${{ matrix.target }}
-          path: sekai-server-*
+          name: sekai-server-${{ matrix.os }}-${{ matrix.arch }}
+          path: sekai-server-${{ matrix.os }}-${{ matrix.arch }}*
 
   release:
     name: Create Release
