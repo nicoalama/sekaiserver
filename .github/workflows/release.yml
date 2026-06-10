@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - linux/amd64
+          - linux/arm64
+          - darwin/amd64
+          - darwin/arm64
+          - windows/amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.target-os }}
+          GOARCH: ${{ matrix.target-arch }}
+        run: |
+          os_arch="${{ matrix.target }}"
+          os="${os_arch%%/*}"
+          arch="${os_arch##*/}"
+          ext=""
+          [ "$os" = "windows" ] && ext=".exe"
+          output="sekai-server-${os}-${arch}${ext}"
+          GOOS="$os" GOARCH="$arch" go build -ldflags="-s -w" -o "$output" .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sekai-server-${{ matrix.target }}
+          path: sekai-server-*
+
+  release:
+    name: Create Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sekai-server-*
+          merge-multiple: true
+
+      - name: Checksums
+        run: sha256sum sekai-server-* > checksums.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            sekai-server-linux-amd64
+            sekai-server-linux-arm64
+            sekai-server-darwin-amd64
+            sekai-server-darwin-arm64
+            sekai-server-windows-amd64.exe
+            checksums.txt
+          generate_release_notes: true
