@@ -1,0 +1,5 @@
+sekai-server
+sekai-server.exe
+*.test
+*.out
+dist/
