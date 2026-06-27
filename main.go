@@ -67,11 +67,26 @@ func main() {
 		}
 	})
 
+	// SEKAILINK_API_KEY env var tiene prioridad sobre flag y config file
+	envKey := os.Getenv("SEKAILINK_API_KEY")
+	keyFromEnv := envKey != ""
+	if keyFromEnv {
+		cfg.APIKey = envKey
+	}
+
 	if err := cfg.Validate(); err != nil {
 		log.Fatalf("invalid configuration: %v", err)
 	}
 
-	if err := cfg.Save(*cfgPath); err != nil {
+	// No guardar la api_key en disco si viene de variable de entorno
+	if keyFromEnv {
+		origKey := cfg.APIKey
+		cfg.APIKey = ""
+		if err := cfg.Save(*cfgPath); err != nil {
+			log.Printf("warning: cannot save config: %v", err)
+		}
+		cfg.APIKey = origKey
+	} else if err := cfg.Save(*cfgPath); err != nil {
 		log.Printf("warning: cannot save config: %v", err)
 	}
 
