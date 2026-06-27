@@ -74,16 +74,59 @@ fi
 # ── Download binary ───────────────────────────────────────────────────────────
 echo "Downloading sekai-server ${VERSION} for ${OS}/${ARCH}..."
 
+DOWNLOAD_FILE="/tmp/${BIN_NAME}${EXT}"
+CHECKSUM_FILE="/tmp/${BIN_NAME}-checksums.txt"
+
+if [ "$VERSION" = "latest" ]; then
+  CHECKSUM_URL="https://github.com/${REPO}/releases/latest/download/checksums.txt"
+else
+  CHECKSUM_URL="https://github.com/${REPO}/releases/download/${VERSION}/checksums.txt"
+fi
+
+# Download binary
 if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$DOWNLOAD_URL" -o "/tmp/${BIN_NAME}${EXT}"
+  curl -fsSL "$DOWNLOAD_URL" -o "$DOWNLOAD_FILE"
+  curl -fsSL "$CHECKSUM_URL" -o "$CHECKSUM_FILE"
 elif command -v wget >/dev/null 2>&1; then
-  wget -q "$DOWNLOAD_URL" -O "/tmp/${BIN_NAME}${EXT}"
+  wget -q "$DOWNLOAD_URL" -O "$DOWNLOAD_FILE"
+  wget -q "$CHECKSUM_URL" -O "$CHECKSUM_FILE"
 else
   echo "Error: need curl or wget to download"
   exit 1
 fi
 
-chmod +x "/tmp/${BIN_NAME}${EXT}"
+# ── Verify SHA256 ─────────────────────────────────────────────────────────────
+BINARY_FILENAME="${BIN_NAME}-${OS}-${ARCH}${EXT}"
+EXPECTED_HASH="$(grep "${BINARY_FILENAME}" "$CHECKSUM_FILE" | awk '{print $1}')"
+
+if [ -z "$EXPECTED_HASH" ]; then
+  echo "Warning: no se pudo verificar checksum (${BINARY_FILENAME} no encontrado en checksums.txt)"
+elif command -v sha256sum >/dev/null 2>&1; then
+  COMPUTED_HASH="$(sha256sum "$DOWNLOAD_FILE" | awk '{print $1}')"
+  if [ "$EXPECTED_HASH" != "$COMPUTED_HASH" ]; then
+    echo "Error: checksum no coincide!"
+    echo "  Esperado: ${EXPECTED_HASH}"
+    echo "  Obtenido: ${COMPUTED_HASH}"
+    rm -f "$DOWNLOAD_FILE" "$CHECKSUM_FILE"
+    exit 1
+  fi
+  echo "Checksum SHA256 verificado correctamente."
+elif command -v shasum >/dev/null 2>&1; then
+  COMPUTED_HASH="$(shasum -a 256 "$DOWNLOAD_FILE" | awk '{print $1}')"
+  if [ "$EXPECTED_HASH" != "$COMPUTED_HASH" ]; then
+    echo "Error: checksum no coincide!"
+    echo "  Esperado: ${EXPECTED_HASH}"
+    echo "  Obtenido: ${COMPUTED_HASH}"
+    rm -f "$DOWNLOAD_FILE" "$CHECKSUM_FILE"
+    exit 1
+  fi
+  echo "Checksum SHA256 verificado correctamente."
+else
+  echo "Warning: no se pudo verificar checksum (falta sha256sum o shasum)"
+fi
+
+rm -f "$CHECKSUM_FILE"
+chmod +x "$DOWNLOAD_FILE"
 
 # ── Move to install directory ────────────────────────────────────────────────
 if [ "$OS" = "windows" ]; then
