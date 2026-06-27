@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,10 +15,16 @@ type Proxy struct {
 }
 
 func New(target string) *Proxy {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: false,
+		},
+	}
 	return &Proxy{
 		Target: target,
 		client: &http.Client{
-			Timeout: 120 * time.Second,
+			Timeout:   120 * time.Second,
+			Transport: transport,
 		},
 	}
 }

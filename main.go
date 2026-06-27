@@ -22,6 +22,7 @@ func main() {
 	apiKey := flag.String("api-key", "", "API key (from web dashboard)")
 	localHost := flag.String("local-host", "localhost", "local host to proxy to")
 	localPort := flag.Int("local-port", 3000, "local port to proxy to")
+	allowExternalHost := flag.Bool("allow-external-host", false, "allow proxying to non-loopback addresses")
 	flag.Parse()
 
 	if *cfgPath == "" {
@@ -33,11 +34,12 @@ func main() {
 	}
 
 	cfg := &config.Config{
-		Relay:       *relay,
-		LocalHost:   *localHost,
-		LocalPort:   *localPort,
-		URLProvider: *urlProvider,
-		APIKey:      *apiKey,
+		Relay:             *relay,
+		LocalHost:         *localHost,
+		LocalPort:         *localPort,
+		URLProvider:       *urlProvider,
+		APIKey:            *apiKey,
+		AllowExternalHost: *allowExternalHost,
 	}
 
 	if existing, err := config.LoadFile(*cfgPath); err == nil {
@@ -60,6 +62,8 @@ func main() {
 			if v, err := strconv.Atoi(f.Value.String()); err == nil {
 				cfg.LocalPort = v
 			}
+		case "allow-external-host":
+			cfg.AllowExternalHost = true
 		}
 	})
 

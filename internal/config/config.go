@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -10,11 +11,12 @@ import (
 )
 
 type Config struct {
-	Relay       string `json:"relay"`
-	URLProvider string `json:"url_provider"`
-	APIKey      string `json:"api_key"`
-	LocalHost   string `json:"local_host"`
-	LocalPort   int    `json:"local_port"`
+	Relay             string `json:"relay"`
+	URLProvider       string `json:"url_provider"`
+	APIKey            string `json:"api_key"`
+	LocalHost         string `json:"local_host"`
+	LocalPort         int    `json:"local_port"`
+	AllowExternalHost bool   `json:"allow_external_host"`
 }
 
 func DefaultConfigPath() (string, error) {
@@ -68,7 +70,25 @@ func (c *Config) Validate() error {
 	if c.LocalHost == "" {
 		c.LocalHost = "localhost"
 	}
+	if !c.AllowExternalHost && !isLoopback(c.LocalHost) {
+		return fmt.Errorf("local_host %q no es una direccion loopback (usar --allow-external-host para permitir)", c.LocalHost)
+	}
 	return nil
+}
+
+func isLoopback(host string) bool {
+	// Si no tiene puerto, resolver a IPs y verificar
+	ips, err := net.LookupHost(host)
+	if err != nil {
+		return false
+	}
+	for _, ip := range ips {
+		parsed := net.ParseIP(ip)
+		if parsed != nil && parsed.IsLoopback() {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Config) ExtractCode() string {
