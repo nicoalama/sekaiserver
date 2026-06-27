@@ -10,6 +10,11 @@ import (
 	"strings"
 )
 
+const (
+	DefaultMaxBodySizeMB = 10
+	MaxMaxBodySizeMB     = 100
+)
+
 type Config struct {
 	Relay             string `json:"relay"`
 	URLProvider       string `json:"url_provider"`
@@ -17,6 +22,7 @@ type Config struct {
 	LocalHost         string `json:"local_host"`
 	LocalPort         int    `json:"local_port"`
 	AllowExternalHost bool   `json:"allow_external_host"`
+	MaxBodySizeMB     int    `json:"max_body_size_mb"`
 }
 
 func DefaultConfigPath() (string, error) {
@@ -72,6 +78,12 @@ func (c *Config) Validate() error {
 	}
 	if !c.AllowExternalHost && !isLoopback(c.LocalHost) {
 		return fmt.Errorf("local_host %q no es una direccion loopback (usar --allow-external-host para permitir)", c.LocalHost)
+	}
+	if c.MaxBodySizeMB <= 0 {
+		c.MaxBodySizeMB = DefaultMaxBodySizeMB
+	}
+	if c.MaxBodySizeMB > MaxMaxBodySizeMB {
+		return fmt.Errorf("max_body_size_mb no puede superar %d", MaxMaxBodySizeMB)
 	}
 	return nil
 }

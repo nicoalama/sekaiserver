@@ -10,18 +10,20 @@ import (
 )
 
 type Proxy struct {
-	Target string
-	client *http.Client
+	Target      string
+	client      *http.Client
+	maxBodySize int64
 }
 
-func New(target string) *Proxy {
+func New(target string, maxBodySizeMB int) *Proxy {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: false,
 		},
 	}
 	return &Proxy{
-		Target: target,
+		Target:      target,
+		maxBodySize: int64(maxBodySizeMB) * 1024 * 1024,
 		client: &http.Client{
 			Timeout:   120 * time.Second,
 			Transport: transport,
@@ -62,9 +64,12 @@ func (p *Proxy) Forward(method, path string, headers map[string]string, body str
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, p.maxBodySize+1))
 	if err != nil {
 		return nil, fmt.Errorf("reading response: %w", err)
+	}
+	if int64(len(respBody)) > p.maxBodySize {
+		return nil, fmt.Errorf("response body exceeds %d bytes (%d MB)", p.maxBodySize, p.maxBodySize/(1024*1024))
 	}
 
 	outHeaders := make(map[string]string)

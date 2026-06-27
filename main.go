@@ -23,6 +23,7 @@ func main() {
 	localHost := flag.String("local-host", "localhost", "local host to proxy to")
 	localPort := flag.Int("local-port", 3000, "local port to proxy to")
 	allowExternalHost := flag.Bool("allow-external-host", false, "allow proxying to non-loopback addresses")
+	maxBodySize := flag.Int("max-body-size", config.DefaultMaxBodySizeMB, "max response body size in MB (1-100)")
 	flag.Parse()
 
 	if *cfgPath == "" {
@@ -40,6 +41,7 @@ func main() {
 		URLProvider:       *urlProvider,
 		APIKey:            *apiKey,
 		AllowExternalHost: *allowExternalHost,
+		MaxBodySizeMB:     *maxBodySize,
 	}
 
 	if existing, err := config.LoadFile(*cfgPath); err == nil {
@@ -64,6 +66,10 @@ func main() {
 			}
 		case "allow-external-host":
 			cfg.AllowExternalHost = true
+		case "max-body-size":
+			if v, err := strconv.Atoi(f.Value.String()); err == nil {
+				cfg.MaxBodySizeMB = v
+			}
 		}
 	})
 

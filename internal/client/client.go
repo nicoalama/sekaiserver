@@ -30,7 +30,7 @@ func New(cfg *config.Config) *Client {
 	target := fmt.Sprintf("http://%s:%d", cfg.LocalHost, cfg.LocalPort)
 	return &Client{
 		cfg:   cfg,
-		proxy: proxy.New(target),
+		proxy: proxy.New(target, cfg.MaxBodySizeMB),
 		done:  make(chan struct{}),
 		http: &http.Client{
 			Timeout: 30 * time.Second,
