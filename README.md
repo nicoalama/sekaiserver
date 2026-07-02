@@ -30,7 +30,7 @@
 
 ## Quick start
 
-1. Go to **[sekailink.dev](https://sekailink.dev)** and create an account.
+1. Go to **[sekailink.dev](https://sekailink.dev)** and log in with Google.
 2. Generate a credential — you'll get a **URL Provider** and an **API Key**.
 3. Install and run sekai-server:
 
@@ -136,5 +136,5 @@ Just pass your API key in the `x-api-key` header (or `Authorization: Bearer`).
 
 ## Related
 
-- **[sekai-core](https://github.com/nicoalama/sekai-core)** — WebSocket relay server
+- **sekai-core** — WebSocket relay server (part of the stack, separate binary)
 - **[sekailink.dev](https://sekailink.dev)** — Web dashboard for credential management
