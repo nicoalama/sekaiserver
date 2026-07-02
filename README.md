@@ -121,11 +121,18 @@ Just pass your API key in the `x-api-key` header (or `Authorization: Bearer`).
 
 ### Tools that work out of the box
 
+sekai-server exposes a standard OpenAI-compatible API, so any tool that supports OpenAI can connect:
+
 - [opencode](https://opencode.ai)
 - [Cursor](https://cursor.com)
-- [Continue](https://continue.dev)
+- [Hermes Agent](https://hermes-agent.nousresearch.com) (by Nous Research)
+- [OpenClaw](https://openclaw.ai)
 - [LangChain](https://langchain.com)
 - Any OpenAI-compatible SDK
+
+### LLM Providers
+
+Tested with **Ollama**. Should work with any local LLM that exposes an HTTP API — **LM Studio**, **llama.cpp**, **LocalAI**, **vLLM**, and anything serving an OpenAI-compatible endpoint. If it runs on your machine, sekai-server can tunnel it.
 
 ## Architecture
 
