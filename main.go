@@ -17,11 +17,11 @@ func main() {
 	log.SetFlags(log.Ltime | log.Lshortfile)
 
 	cfgPath := flag.String("config", "", "path to config file")
-	relay := flag.String("relay", "wss://sekailink.vercel.app", "relay server address")
+	relay := flag.String("relay", "ws://localhost:8080", "sekai-core WebSocket address")
 	urlProvider := flag.String("url-provider", "", "URL provider (from web dashboard)")
 	apiKey := flag.String("api-key", "", "API key (from web dashboard)")
 	localHost := flag.String("local-host", "localhost", "local host to proxy to")
-	localPort := flag.Int("local-port", 3000, "local port to proxy to")
+	localPort := flag.Int("local-port", 11434, "local port to proxy to")
 	allowExternalHost := flag.Bool("allow-external-host", false, "allow proxying to non-loopback addresses")
 	maxBodySize := flag.Int("max-body-size", config.DefaultMaxBodySizeMB, "max response body size in MB (1-100)")
 	flag.Parse()
@@ -73,7 +73,21 @@ func main() {
 		}
 	})
 
-	// SEKAILINK_API_KEY env var tiene prioridad sobre flag y config file
+	// Env vars tienen prioridad sobre flag y config file
+	if v := os.Getenv("RELAY"); v != "" {
+		cfg.Relay = v
+	}
+	if v := os.Getenv("URL_PROVIDER"); v != "" {
+		cfg.URLProvider = v
+	}
+	if v := os.Getenv("LOCAL_HOST"); v != "" {
+		cfg.LocalHost = v
+	}
+	if v := os.Getenv("LOCAL_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			cfg.LocalPort = p
+		}
+	}
 	envKey := os.Getenv("SEKAILINK_API_KEY")
 	keyFromEnv := envKey != ""
 	if keyFromEnv {
@@ -84,7 +98,7 @@ func main() {
 		log.Fatalf("invalid configuration: %v", err)
 	}
 
-	// No guardar la api_key en disco si viene de variable de entorno
+	// No guardar la api_key en disco si alguna clave vino de variable de entorno
 	if keyFromEnv {
 		origKey := cfg.APIKey
 		cfg.APIKey = ""
@@ -97,7 +111,7 @@ func main() {
 	}
 
 	log.Printf("url_provider: %s", cfg.URLProvider)
-	log.Printf("relay: %s", cfg.Relay)
+	log.Printf("relay (ws): %s", cfg.Relay)
 	log.Printf("local: %s:%d", cfg.LocalHost, cfg.LocalPort)
 
 	cl := client.New(cfg)

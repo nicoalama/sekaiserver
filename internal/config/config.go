@@ -47,14 +47,14 @@ func LoadFile(path string) (*Config, error) {
 
 func (c *Config) Save(path string) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return fmt.Errorf("creating config dir: %w", err)
 	}
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling config: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0600); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}
 	return nil
@@ -76,8 +76,8 @@ func (c *Config) Validate() error {
 	if c.LocalHost == "" {
 		c.LocalHost = "localhost"
 	}
-	if !c.AllowExternalHost && !isLoopback(c.LocalHost) {
-		return fmt.Errorf("local_host %q no es una direccion loopback (usar --allow-external-host para permitir)", c.LocalHost)
+	if err := c.validateLocalHost(); err != nil {
+		return err
 	}
 	if c.MaxBodySizeMB <= 0 {
 		c.MaxBodySizeMB = DefaultMaxBodySizeMB
@@ -88,19 +88,53 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func isLoopback(host string) bool {
-	// Si no tiene puerto, resolver a IPs y verificar
-	ips, err := net.LookupHost(host)
-	if err != nil {
-		return false
-	}
-	for _, ip := range ips {
-		parsed := net.ParseIP(ip)
-		if parsed != nil && parsed.IsLoopback() {
-			return true
-		}
+func isLinkLocal(ip net.IP) bool {
+	if ip4 := ip.To4(); ip4 != nil {
+		return ip4[0] == 169 && ip4[1] == 254
 	}
 	return false
+}
+
+func (c *Config) validateLocalHost() error {
+	ips, err := net.LookupHost(c.LocalHost)
+	if err != nil {
+		if c.AllowExternalHost {
+			fmt.Fprintf(os.Stderr, "WARNING: cannot resolve local_host %q: %v\n", c.LocalHost, err)
+			return nil
+		}
+		return fmt.Errorf("resolving local_host %q: %w", c.LocalHost, err)
+	}
+
+	for _, ipStr := range ips {
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			continue
+		}
+		if ip.Equal(net.ParseIP("169.254.169.254")) {
+			return fmt.Errorf("local_host cannot be cloud metadata IP (169.254.169.254)")
+		}
+		if isLinkLocal(ip) {
+			return fmt.Errorf("local_host cannot be a link-local address (169.254.x.x)")
+		}
+	}
+
+	if c.AllowExternalHost {
+		for _, ipStr := range ips {
+			ip := net.ParseIP(ipStr)
+			if ip != nil && ip.IsPrivate() {
+				fmt.Fprintf(os.Stderr, "WARNING: local_host %s (%s) is a private IP — SSRF risk if relay is compromised\n", c.LocalHost, ip.String())
+			}
+		}
+		return nil
+	}
+
+	for _, ipStr := range ips {
+		ip := net.ParseIP(ipStr)
+		if ip != nil && ip.IsLoopback() {
+			return nil
+		}
+	}
+	return fmt.Errorf("local_host %q is not a loopback address (use --allow-external-host to allow)", c.LocalHost)
 }
 
 func (c *Config) ExtractCode() string {

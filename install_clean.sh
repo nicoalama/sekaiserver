@@ -8,7 +8,7 @@ CONFIG_DIR="${HOME}/.sekai-server"
 CONFIG_FILE="${CONFIG_DIR}/config.json"
 BIN_NAME="sekai-server"
 
-# ── Parse flags ──────────────────────────────────────────────────────────────
+#  Parse flags 
 URL_PROVIDER=""
 API_KEY=""
 LOCAL_PORT=""
@@ -17,7 +17,6 @@ RELAY=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --uninstall)      exec "$(dirname "$0")/uninstall.sh" --yes ;;
     --url-provider=*) URL_PROVIDER="${1#*=}" ;;
     --api-key=*)      API_KEY="${1#*=}" ;;
     --local-port=*)   LOCAL_PORT="${1#*=}" ;;
@@ -26,44 +25,14 @@ while [ $# -gt 0 ]; do
     --install-dir=*)  INSTALL_DIR="${1#*=}" ;;
     *)
       echo "Unknown option: $1"
-      echo "Usage: install.sh [--uninstall] [--url-provider=URL] [--api-key=KEY] [--local-port=PORT] [--local-host=HOST] [--relay=URL]"
+      echo "Usage: install.sh [--url-provider=URL] [--api-key=KEY] [--local-port=PORT] [--local-host=HOST] [--relay=URL]"
       exit 1
       ;;
   esac
   shift
 done
 
-# ── Resolve config values (flag > env > prompt) ──────────────────────────────
-INTERACTIVE=false
-
-[ -z "$RELAY" ] && RELAY="${SEKAILINK_RELAY:-}"
-[ -z "$URL_PROVIDER" ] && URL_PROVIDER="${SEKAILINK_URL_PROVIDER:-}"
-[ -z "$API_KEY" ] && API_KEY="${SEKAILINK_API_KEY:-}"
-
-if [ -z "$RELAY" ] || [ -z "$URL_PROVIDER" ] || [ -z "$API_KEY" ]; then
-  INTERACTIVE=true
-  echo "=============================================="
-  echo "  sekai-server installer"
-  echo "=============================================="
-  echo ""
-
-  if [ -z "$RELAY" ]; then
-    printf "sekai-core WebSocket address (e.g. wss://core.sekailink.dev): "
-    read -r RELAY
-  fi
-  if [ -z "$URL_PROVIDER" ]; then
-    printf "Your credential URL from the dashboard: "
-    read -r URL_PROVIDER
-  fi
-  if [ -z "$API_KEY" ]; then
-    printf "Your API key: "
-    read -r API_KEY
-  fi
-
-  echo ""
-fi
-
-# ── Detect OS and architecture ───────────────────────────────────────────────
+#  Detect OS and architecture 
 OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 
@@ -92,7 +61,7 @@ if [ "$OS" = "windows" ] && [ "$ARCH" = "arm64" ]; then
   exit 1
 fi
 
-# ── Resolve download URL ─────────────────────────────────────────────────────
+#  Resolve download URL 
 EXT=""
 [ "$OS" = "windows" ] && EXT=".exe"
 
@@ -102,14 +71,11 @@ else
   DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${VERSION}/${BIN_NAME}-${OS}-${ARCH}${EXT}"
 fi
 
-# ── Download binary ───────────────────────────────────────────────────────────
+#  Download binary 
 echo "Downloading sekai-server ${VERSION} for ${OS}/${ARCH}..."
 
-TEMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TEMP_DIR"' EXIT
-
-DOWNLOAD_FILE="${TEMP_DIR}/${BIN_NAME}${EXT}"
-CHECKSUM_FILE="${TEMP_DIR}/checksums.txt"
+DOWNLOAD_FILE="/tmp/${BIN_NAME}${EXT}"
+CHECKSUM_FILE="/tmp/${BIN_NAME}-checksums.txt"
 
 if [ "$VERSION" = "latest" ]; then
   CHECKSUM_URL="https://github.com/${REPO}/releases/latest/download/checksums.txt"
@@ -117,6 +83,7 @@ else
   CHECKSUM_URL="https://github.com/${REPO}/releases/download/${VERSION}/checksums.txt"
 fi
 
+# Download binary
 if command -v curl >/dev/null 2>&1; then
   curl -fsSL "$DOWNLOAD_URL" -o "$DOWNLOAD_FILE"
   curl -fsSL "$CHECKSUM_URL" -o "$CHECKSUM_FILE"
@@ -128,14 +95,12 @@ else
   exit 1
 fi
 
-# ── Verify SHA256 ─────────────────────────────────────────────────────────────
+#  Verify SHA256 
 BINARY_FILENAME="${BIN_NAME}-${OS}-${ARCH}${EXT}"
 EXPECTED_HASH="$(grep "${BINARY_FILENAME}" "$CHECKSUM_FILE" | awk '{print $1}')"
 
 if [ -z "$EXPECTED_HASH" ]; then
-  echo "Error: no se encontró checksum para ${BINARY_FILENAME}"
-  rm -f "$DOWNLOAD_FILE" "$CHECKSUM_FILE"
-  exit 1
+  echo "Warning: no se pudo verificar checksum (${BINARY_FILENAME} no encontrado en checksums.txt)"
 elif command -v sha256sum >/dev/null 2>&1; then
   COMPUTED_HASH="$(sha256sum "$DOWNLOAD_FILE" | awk '{print $1}')"
   if [ "$EXPECTED_HASH" != "$COMPUTED_HASH" ]; then
@@ -157,25 +122,25 @@ elif command -v shasum >/dev/null 2>&1; then
   fi
   echo "Checksum SHA256 verificado correctamente."
 else
-  echo "Error: no se pudo verificar checksum (falta sha256sum o shasum)"
-  rm -f "$DOWNLOAD_FILE" "$CHECKSUM_FILE"
-  exit 1
+  echo "Warning: no se pudo verificar checksum (falta sha256sum o shasum)"
 fi
 
 rm -f "$CHECKSUM_FILE"
 chmod +x "$DOWNLOAD_FILE"
 
-# ── Move to install directory ────────────────────────────────────────────────
+#  Move to install directory 
 if [ "$OS" = "windows" ]; then
-  mv "$DOWNLOAD_FILE" "./${BIN_NAME}${EXT}"
+  # On Windows, just put it next to the script or in current dir
+  mv "/tmp/${BIN_NAME}${EXT}" "./${BIN_NAME}${EXT}"
   INSTALLED_PATH="$(pwd)/${BIN_NAME}${EXT}"
 else
   if [ -d "$INSTALL_DIR" ] && [ -w "$INSTALL_DIR" ]; then
-    mv "$DOWNLOAD_FILE" "${INSTALL_DIR}/${BIN_NAME}"
+    mv "/tmp/${BIN_NAME}${EXT}" "${INSTALL_DIR}/${BIN_NAME}"
     INSTALLED_PATH="${INSTALL_DIR}/${BIN_NAME}"
   else
+    # Fallback: install to HOME/.local/bin
     mkdir -p "${HOME}/.local/bin"
-    mv "$DOWNLOAD_FILE" "${HOME}/.local/bin/${BIN_NAME}"
+    mv "/tmp/${BIN_NAME}${EXT}" "${HOME}/.local/bin/${BIN_NAME}"
     INSTALLED_PATH="${HOME}/.local/bin/${BIN_NAME}"
     echo "Warning: could not write to ${INSTALL_DIR}, installed to ${INSTALLED_PATH}"
     echo "Add ${HOME}/.local/bin to your PATH if not already."
@@ -184,41 +149,65 @@ fi
 
 echo "Installed to ${INSTALLED_PATH}"
 
-# ── Save config ──────────────────────────────────────────────────────────────
-# Set defaults for non-required fields
-LOCAL_HOST="${LOCAL_HOST:-localhost}"
-LOCAL_PORT="${LOCAL_PORT:-11434}"
+#  Save config 
+if [ -n "$URL_PROVIDER" ] || [ -n "$API_KEY" ]; then
+  mkdir -p "$CONFIG_DIR"
 
-mkdir -p "$CONFIG_DIR"
+  # Read existing config if any
+  OLD_CONFIG=""
+  if [ -f "$CONFIG_FILE" ]; then
+    OLD_CONFIG=$(cat "$CONFIG_FILE")
+  fi
 
-cat > "$CONFIG_FILE" << EOF
-{
-  "relay": "${RELAY}",
-  "url_provider": "${URL_PROVIDER}",
-  "api_key": "${API_KEY}",
-  "local_host": "${LOCAL_HOST}",
-  "local_port": ${LOCAL_PORT}
-}
-EOF
+  # Build JSON config (merge with existing)
+  if command -v jq >/dev/null 2>&1; then
+    # Use jq for robust JSON manipulation
+    RELAY="${RELAY:-$(echo "$OLD_CONFIG" | jq -r '.relay // empty')}"
+    RELAY="${RELAY:-https://sekailink.dev}"
+    LOCAL_HOST="${LOCAL_HOST:-$(echo "$OLD_CONFIG" | jq -r '.local_host // empty')}"
+    LOCAL_HOST="${LOCAL_HOST:-localhost}"
+    LOCAL_PORT="${LOCAL_PORT:-$(echo "$OLD_CONFIG" | jq -r '.local_port // empty')}"
+    LOCAL_PORT="${LOCAL_PORT:-3000}"
 
-echo "Config saved to ${CONFIG_FILE}"
+    NEW_CONFIG=$(echo "{}" | jq \
+      --arg relay "$RELAY" \
+      --arg url_provider "$URL_PROVIDER" \
+      --arg api_key "$API_KEY" \
+      --arg local_host "$LOCAL_HOST" \
+      --argjson local_port "$LOCAL_PORT" \
+      '.relay = $relay | .url_provider = $url_provider | .api_key = $api_key | .local_host = $local_host | .local_port = $local_port'
+    )
+    echo "$NEW_CONFIG" > "$CONFIG_FILE"
+  else
+    # Fallback: simple shell JSON construction
+    RELAY="${RELAY:-$(echo "$OLD_CONFIG" | sed -n 's/.*"relay"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')}"
+    RELAY="${RELAY:-https://sekailink.dev}"
+    LOCAL_HOST="${LOCAL_HOST:-$(echo "$OLD_CONFIG" | sed -n 's/.*"local_host"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')}"
+    LOCAL_HOST="${LOCAL_HOST:-localhost}"
+    LOCAL_PORT="${LOCAL_PORT:-$(echo "$OLD_CONFIG" | sed -n 's/.*"local_port"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/p')}"
+    LOCAL_PORT="${LOCAL_PORT:-3000"}
 
-# ── Start sekai-server ──────────────────────────────────────────────────────
-START_NOW=true
-if [ "$INTERACTIVE" = true ]; then
-  echo ""
-  printf "Start sekai-server now? [Y/n] "
-  read -r START_REPLY
-  case "$START_REPLY" in
-    n|N|no|NO) START_NOW=false ;;
-  esac
+    cat > "$CONFIG_FILE" <<- ENDOFFILE
+	{
+	  "relay": "${RELAY}",
+	  "url_provider": "${URL_PROVIDER}",
+	  "api_key": "${API_KEY}",
+	  "local_host": "${LOCAL_HOST}",
+	  "local_port": ${LOCAL_PORT}
+	}
+ENDOFFILE
+  fi
+
+  echo "Config saved to ${CONFIG_FILE}"
 fi
 
-if [ "$START_NOW" = true ]; then
+#  Start sekai-server 
+if [ -f "$CONFIG_FILE" ] && [ -s "$CONFIG_FILE" ]; then
   echo ""
   echo "Starting sekai-server..."
   echo ""
 
+  # Run in background
   if [ "$OS" = "windows" ]; then
     "${INSTALLED_PATH}" &
   else
@@ -230,4 +219,14 @@ if [ "$START_NOW" = true ]; then
   echo ""
   echo "To check logs, run: ${INSTALLED_PATH} 2>&1"
   echo "To stop, run: kill ${PID}"
+else
+  echo ""
+  echo "No config found. Run with --url-provider and --api-key flags to configure."
+  echo "Example:"
+  echo "  curl -sL https://raw.githubusercontent.com/${REPO}/main/install.sh | sh -s -- \\"
+  echo "    --url-provider=https://sekailink.dev/YOUR_CODE \\"
+  echo "    --api-key=sk_YOUR_API_KEY"
+  echo ""
+  echo "Or run the binary directly:"
+  echo "  ${INSTALLED_PATH} --url-provider=... --api-key=..."
 fi

@@ -1,0 +1,25 @@
+# Sekai Server + Ollama
+# Uso: docker compose up -d
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+
+  sekai-server:
+    image: ghcr.io/nicoalama/sekai-server:latest
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    environment:
+      - RELAY=wss://core.sekailink.dev
+      - URL_PROVIDER=https://sekailink.dev/t_YOUR_CODE
+      - API_KEY=sk_YOUR_API_KEY
+      - LOCAL_HOST=ollama
+      - LOCAL_PORT=11434
+
+volumes:
+  ollama_data:

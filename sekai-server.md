@@ -2,7 +2,7 @@
 
 ## Overview
 
-`sekai-server` is a standalone Go binary that runs on the user's machine. It establishes a persistent outbound WebSocket connection to the web (sekailink.vercel.app), allowing the web to route incoming API requests to the user's localhost without opening any inbound ports.
+`sekai-server` is a standalone Go binary that runs on the user's machine. It establishes a persistent outbound WebSocket connection to the web (sekailink.dev), allowing the web to route incoming API requests to the user's localhost without opening any inbound ports.
 
 This is the same architectural pattern as Cloudflare Tunnel, Tailscale Funnel, and ngrok agent — but self-hosted and tightly integrated with the sekailink credential system.
 
@@ -12,7 +12,7 @@ This is the same architectural pattern as Cloudflare Tunnel, Tailscale Funnel, a
 
 ### 1. User creates a credential on the web
 
-User A logs into sekailink.vercel.app, creates a credential:
+User A logs into sekailink.dev, creates a credential:
 
 - Web generates `code` (random), `apiKey` (HMAC), `urlProvider`
 - Web stores credential in Neon with hashed apiKey
@@ -20,15 +20,15 @@ User A logs into sekailink.vercel.app, creates a credential:
 
 **User receives:**
 ```
-urlProvider: https://sekailink.vercel.app/t_kAnIy
+urlProvider: https://sekailink.dev/t_kAnIy
 apiKey:      sk-abc123def456...
 ```
 
 ### 2. User installs and runs sekai-server
 
 ```
-curl -sL https://sekailink.vercel.app/install | sh -s -- \
-  --url-provider=https://sekailink.vercel.app/t_kAnIy \
+curl -sL https://sekailink.dev/install | sh -s -- \
+  --url-provider=https://sekailink.dev/t_kAnIy \
   --api-key=sk-abc123def456... \
   --local-port=3000
 ```
@@ -43,7 +43,7 @@ On start, `sekai-server`:
 
 1. Reads config (or flags)
 2. Extracts the `code` from `urlProvider` (e.g., `t_kAnIy`)
-3. Connects to `wss://sekailink.vercel.app/api/gateway/connect?code=t_kAnIy`
+3. Connects to `wss://sekailink.dev/api/gateway/connect?code=t_kAnIy`
 4. Authenticates the WebSocket connection by sending the `apiKey` in the first message
 5. Enters a persistent event loop: wait for requests from the web, proxy to localhost, send responses back
 6. Also sends periodic heartbeats to keep the connection alive and signal "I'm online"
@@ -55,7 +55,7 @@ If the connection drops, it retries with exponential backoff.
 User opens opencode / claude code:
 ```
 OpenAI Compatible Provider
-  URL:   https://sekailink.vercel.app/t_kAnIy
+  URL:   https://sekailink.dev/t_kAnIy
   API Key: sk-abc123def456...
 ```
 
@@ -64,7 +64,7 @@ All AI requests go to this URL.
 ### 4. Request flow (runtime)
 
 ```
-opencode                    sekailink.vercel.app              user machine
+opencode                    sekailink.dev              user machine
    │                              │                               │
    │── POST /t_kAnIy ────────────►│                               │
    │   (with apiKey in header)    │                               │
@@ -129,7 +129,7 @@ The protocol is intentionally simple. No streaming yet — each request gets one
 
 ### Authentication flow on WebSocket connect
 
-1. `sekai-server` opens `wss://sekailink.vercel.app/api/gateway/connect?code=t_kAnIy`
+1. `sekai-server` opens `wss://sekailink.dev/api/gateway/connect?code=t_kAnIy`
 2. Web looks up the credential by `code`
 3. Web generates a **one-time challenge** (random nonce) and sends it to the client
 4. `sekai-server` responds with `{ type: "AUTH", apiKey: "<hmac>" }` — the user signs the challenge
@@ -203,7 +203,7 @@ const connections = new Map<string, WebSocket>();
 
 **Alternative (and likely better for v1): skip Vercel for the tunnel endpoint entirely.**
 
-Instead of routing through `sekailink.vercel.app`, we deploy a **separate lightweight relay** on a cheap VPS ($4/mo Hetzner) or use Fly.io (free tier) — but this contradicts the no-VPS constraint.
+Instead of routing through `sekailink.dev`, we deploy a **separate lightweight relay** on a cheap VPS ($4/mo Hetzner) or use Fly.io (free tier) — but this contradicts the no-VPS constraint.
 
 **Practical reality check:**
 
@@ -235,7 +235,7 @@ No user configuration needed. No port forwarding. No firewall rules.
 ### HTTPS
 
 - `wss://` ensures the WebSocket is encrypted (TLS)
-- `sekailink.vercel.app` handles TLS termination
+- `sekailink.dev` handles TLS termination
 - The HTTP request from opencode to the web is HTTPS
 - The WebSocket from sekai-server to the web is WSS
 - The local connection (sekai-server → localhost:3000) is plain HTTP (internal)
@@ -244,7 +244,7 @@ No user configuration needed. No port forwarding. No firewall rules.
 ### Bigger encryption detail: end-to-end
 
 ```
-opencode ──HTTPS──► sekailink.vercel.app ──WSS──► sekai-server ──HTTP──► localhost:3000
+opencode ──HTTPS──► sekailink.dev ──WSS──► sekai-server ──HTTP──► localhost:3000
 ```
 
 The user's internal localhost can be HTTP since it's the same machine. If the user wants HTTPS to localhost, they can use a self-signed cert (configurable in the future).
@@ -257,7 +257,7 @@ The user's internal localhost can be HTTP since it's the same machine. If the us
 
 ```
 sekai-server \
-  --url-provider=https://sekailink.vercel.app/t_kAnIy \
+  --url-provider=https://sekailink.dev/t_kAnIy \
   --api-key=sk-abc123def456... \
   --local-port=3000
 ```
@@ -268,15 +268,15 @@ Optional flags:
   --config=~/.sekai-server/config.json   # config file (default)
   --host=localhost                        # local host to proxy to
   --local-port=3000                       # local port to proxy to
-  --relay=wss://sekailink.vercel.app      # web server URL
+  --relay=wss://sekailink.dev      # web server URL
 ```
 
 ### Config file (`~/.sekai-server/config.json`)
 
 ```json
 {
-  "relay": "wss://sekailink.vercel.app",
-  "url_provider": "https://sekailink.vercel.app/t_kAnIy",
+  "relay": "wss://sekailink.dev",
+  "url_provider": "https://sekailink.dev/t_kAnIy",
   "api_key": "sk-abc123def456...",
   "local_host": "localhost",
   "local_port": 3000
@@ -335,7 +335,7 @@ binaries per release:
 The installer script:
 
 1. Detects OS and architecture
-2. Downloads the correct binary from GitHub Releases or `https://sekailink.vercel.app/download/{os}/{arch}/sekai-server`
+2. Downloads the correct binary from GitHub Releases or `https://sekailink.dev/download/{os}/{arch}/sekai-server`
 3. Saves binary to `/usr/local/bin/sekai-server`
 4. Creates `~/.sekai-server/config.json` with the provided `--url-provider` and `--api-key`
 5. Optionally: installs systemd service (Linux) or launchd plist (macOS)
@@ -345,13 +345,13 @@ Usage:
 
 ```bash
 # Install and start (everything automatic)
-curl -sL https://sekailink.vercel.app/install | sh -s -- \
-  --url-provider=https://sekailink.vercel.app/t_kAnIy \
+curl -sL https://sekailink.dev/install | sh -s -- \
+  --url-provider=https://sekailink.dev/t_kAnIy \
   --api-key=sk-abc123def456... \
   --local-port=3000
 
 # Install later (config already saved)
-curl -sL https://sekailink.vercel.app/install | sh
+curl -sL https://sekailink.dev/install | sh
 ```
 
 ---
@@ -362,7 +362,7 @@ curl -sL https://sekailink.vercel.app/install | sh
 
 ```
 WebSocket upgrade endpoint
-  Path:  wss://sekailink.vercel.app/api/gateway/connect?code={code}
+  Path:  wss://sekailink.dev/api/gateway/connect?code={code}
   Auth:  challenge-response (apiKey signed with nonce)
   State: in-memory Edge Function Map<code, WebSocket>
 ```
@@ -371,7 +371,7 @@ WebSocket upgrade endpoint
 
 ```
 Handles all incoming requests from AI tools
-  Path:  https://sekailink.vercel.app/{code}/**
+  Path:  https://sekailink.dev/{code}/**
   Auth:  x-api-key header (validated against DB hash)
   Logic: look up WebSocket for code → forward request → return response
 ```
